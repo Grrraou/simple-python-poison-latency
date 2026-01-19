@@ -1,10 +1,18 @@
-.PHONY: dev build clean test help
+.PHONY: dev build clean test help frontend api proxy
 
-# Development
+# =============================================================================
+# FULL STACK (Docker Compose)
+# =============================================================================
+
+# Start all services with Docker Compose
 dev:
 	docker-compose up
 
-# Build production images
+# Start all services in background
+dev-bg:
+	docker-compose up -d
+
+# Build all Docker images
 build:
 	docker-compose build
 
@@ -13,18 +21,104 @@ clean:
 	docker-compose down -v
 	docker-compose rm -f
 
-# Run tests
+# View logs
+logs:
+	docker-compose logs -f
+
+# Stop all services
+stop:
+	docker-compose down
+
+# =============================================================================
+# INDIVIDUAL SERVICES
+# =============================================================================
+
+# --- Frontend ---
+frontend-dev:
+	cd frontend && npm start
+
+frontend-build:
+	cd frontend && npm run build
+
+frontend-install:
+	cd frontend && npm install
+
+# --- Python API ---
+api-dev:
+	cd api && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+api-init:
+	cd api && python init_db.py
+
+# --- Go Proxy ---
+proxy-dev:
+	cd proxy && DATABASE_PATH=../api/users.db PORT=8080 go run ./cmd/server
+
+proxy-build:
+	cd proxy && go build -o bin/latency-poison-proxy ./cmd/server
+
+proxy-test:
+	cd proxy && go test -v ./...
+
+# =============================================================================
+# DOCKER INDIVIDUAL BUILDS
+# =============================================================================
+
+docker-frontend:
+	docker build -t latency-poison-frontend:latest ./frontend
+
+docker-api:
+	docker build -t latency-poison-api:latest ./api
+
+docker-proxy:
+	docker build -t latency-poison-proxy:latest ./proxy
+
+# =============================================================================
+# TESTS
+# =============================================================================
+
 test:
 	docker-compose run --rm api pytest
 
-# Help
-help:
-	@echo "Available commands:"
-	@echo "  make dev      - Start development environment (frontend: http://localhost:3000, api: http://localhost:8000)"
-	@echo "  make build    - Build production images"
-	@echo "  make clean    - Clean up containers and volumes"
-	@echo "  make test     - Run tests"
-	@echo "  make help     - Show this help message"
+test-proxy:
+	cd proxy && go test -v ./...
 
-# Default target
-.DEFAULT_GOAL := help 
+# =============================================================================
+# HELP
+# =============================================================================
+
+help:
+	@echo "Latency Poison - The Chaos Proxy"
+	@echo ""
+	@echo "FULL STACK (Docker Compose):"
+	@echo "  make dev           - Start all services (frontend, api, proxy)"
+	@echo "  make dev-bg        - Start all services in background"
+	@echo "  make build         - Build all Docker images"
+	@echo "  make clean         - Stop and remove containers/volumes"
+	@echo "  make logs          - View logs from all services"
+	@echo "  make stop          - Stop all services"
+	@echo ""
+	@echo "INDIVIDUAL SERVICES (for local development):"
+	@echo "  make frontend-dev  - Start frontend dev server (port 3000)"
+	@echo "  make api-dev       - Start Python API (port 8000)"
+	@echo "  make proxy-dev     - Start Go proxy (port 8080)"
+	@echo ""
+	@echo "  make frontend-install - Install frontend dependencies"
+	@echo "  make api-init         - Initialize database"
+	@echo "  make proxy-build      - Build Go proxy binary"
+	@echo ""
+	@echo "DOCKER INDIVIDUAL:"
+	@echo "  make docker-frontend - Build frontend image only"
+	@echo "  make docker-api      - Build Python API image only"
+	@echo "  make docker-proxy    - Build Go proxy image only"
+	@echo ""
+	@echo "TESTING:"
+	@echo "  make test          - Run Python API tests"
+	@echo "  make test-proxy    - Run Go proxy tests"
+	@echo ""
+	@echo "URLs when running:"
+	@echo "  Frontend:  http://localhost:3000"
+	@echo "  API:       http://localhost:8000"
+	@echo "  Proxy:     http://localhost:8080"
+
+.DEFAULT_GOAL := help

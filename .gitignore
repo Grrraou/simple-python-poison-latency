@@ -76,6 +76,17 @@ yarn-error.log*
 *.sqlite3
 /data/*.db
 
+# Go
+proxy/bin/
+proxy/*.exe
+proxy/*.exe~
+proxy/*.dll
+proxy/*.so
+proxy/*.dylib
+proxy/*.test
+proxy/*.out
+proxy/vendor/
+
 # Docker
 .docker/
 docker-compose.override.yml

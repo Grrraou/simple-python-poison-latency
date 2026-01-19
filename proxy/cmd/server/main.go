@@ -1,0 +1,77 @@
+package main
+
+import (
+	"log"
+	"os"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/joho/godotenv"
+	"go.uber.org/zap"
+
+	"github.com/grrr/latency-sim-proxy/internal/config"
+	"github.com/grrr/latency-sim-proxy/internal/handlers"
+)
+
+func main() {
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: .env file not found")
+	}
+
+	// Initialize logger
+	logger, err := zap.NewProduction()
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Sync()
+
+	// Initialize SQLite connection
+	sqliteClient, err := config.NewSQLiteClient()
+	if err != nil {
+		logger.Fatal("Failed to connect to SQLite database", zap.Error(err))
+	}
+	defer sqliteClient.Close()
+
+	logger.Info("Connected to SQLite database")
+
+	// Create Fiber app
+	app := fiber.New(fiber.Config{
+		AppName: "Latency Simulation Proxy",
+	})
+
+	// Add CORS middleware
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowMethods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
+		AllowHeaders: "Origin,Content-Type,Accept,Authorization,X-API-Key",
+	}))
+
+	// Initialize handlers with SQLite database
+	handler := handlers.NewHandler(logger, sqliteClient.GetDB())
+
+	// Register routes
+	// Sandbox endpoint - no auth required, for quick testing
+	app.Get("/sandbox", handler.SandboxHandler)
+
+	// Proxy endpoint - requires API key, uses database configuration
+	app.All("/proxy/:collectionId/*", handler.ProxyHandler)
+
+	// Health check endpoint
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status": "ok",
+		})
+	})
+
+	// Start server
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	logger.Info("Starting server", zap.String("port", port))
+	if err := app.Listen(":" + port); err != nil {
+		logger.Fatal("Failed to start server", zap.Error(err))
+	}
+}

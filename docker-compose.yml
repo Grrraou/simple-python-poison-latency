@@ -33,7 +33,7 @@ services:
 
   go-proxy:
     build:
-      context: ../latency-poison-go-api
+      context: ./proxy
       dockerfile: Dockerfile
     ports:
       - "8080:8080"

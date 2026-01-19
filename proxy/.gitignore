@@ -1,0 +1,42 @@
+# Binaries and build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+main
+
+# Test binary and coverage
+*.test
+*.out
+*.prof
+*.trace
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Dependency directories (remove the comment below to include it)
+vendor/
+
+# Go workspace file
+go.work 
