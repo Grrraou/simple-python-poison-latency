@@ -12,8 +12,9 @@ import json
 import requests
 import random
 import time
+import secrets
 
-from database import get_db, User as DBUser, Collection as DBCollection, Endpoint as DBEndpoint
+from database import get_db, User as DBUser, Collection as DBCollection, Endpoint as DBEndpoint, ApiKey as DBApiKey
 
 # Security
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
@@ -62,9 +63,43 @@ class CollectionBase(BaseModel):
 class CollectionCreate(CollectionBase):
     pass
 
+class CollectionUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
 class Collection(CollectionBase):
     id: int
     owner_id: int
+    is_active: bool = True
+    request_count: int = 0
+
+    class Config:
+        orm_mode = True
+
+# API Key models
+class ApiKeyBase(BaseModel):
+    name: str
+
+class ApiKeyCreate(ApiKeyBase):
+    all_collections: bool = False
+    collection_ids: List[int] = []
+
+class ApiKeyUpdate(BaseModel):
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
+    all_collections: Optional[bool] = None
+    collection_ids: Optional[List[int]] = None
+
+class ApiKeyResponse(ApiKeyBase):
+    id: int
+    key: str
+    is_active: bool
+    all_collections: bool
+    request_count: int = 0
+    created_at: datetime
+    last_used_at: Optional[datetime]
+    collection_ids: List[int]
 
     class Config:
         orm_mode = True
@@ -79,9 +114,23 @@ class EndpointBase(BaseModel):
     min_latency: int = 0
     max_latency: int = 1000
     sandbox: bool = False
+    is_active: bool = True
+    request_count: int = 0
 
 class EndpointCreate(EndpointBase):
     collection_id: int
+
+class EndpointUpdate(BaseModel):
+    name: Optional[str] = None
+    url: Optional[str] = None
+    method: Optional[str] = None
+    headers: Optional[Dict[str, Any]] = None
+    body: Optional[Dict[str, Any]] = None
+    fail_rate: Optional[int] = None
+    min_latency: Optional[int] = None
+    max_latency: Optional[int] = None
+    sandbox: Optional[bool] = None
+    is_active: Optional[bool] = None
 
 class Endpoint(EndpointBase):
     id: int
@@ -377,6 +426,30 @@ async def read_endpoint(
         raise HTTPException(status_code=404, detail="Endpoint not found")
     return endpoint
 
+@app.put("/api/endpoints/{endpoint_id}/", response_model=Endpoint)
+async def update_endpoint(
+    endpoint_id: int,
+    endpoint_update: EndpointUpdate,
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user)
+):
+    endpoint = db.query(DBEndpoint).join(DBCollection).filter(
+        DBEndpoint.id == endpoint_id,
+        DBCollection.owner_id == current_user.id
+    ).first()
+    if endpoint is None:
+        raise HTTPException(status_code=404, detail="Endpoint not found")
+    
+    # Update only provided fields
+    update_data = endpoint_update.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        if value is not None:
+            setattr(endpoint, field, value)
+    
+    db.commit()
+    db.refresh(endpoint)
+    return endpoint
+
 @app.delete("/api/endpoints/{endpoint_id}/")
 async def delete_endpoint(
     endpoint_id: int,
@@ -391,4 +464,150 @@ async def delete_endpoint(
         raise HTTPException(status_code=404, detail="Endpoint not found")
     db.delete(endpoint)
     db.commit()
-    return {"message": "Endpoint deleted"} 
+    return {"message": "Endpoint deleted"}
+
+# Collection update endpoint (for toggling is_active)
+@app.put("/api/collections/{collection_id}/", response_model=Collection)
+async def update_collection(
+    collection_id: int,
+    collection_update: CollectionUpdate,
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user)
+):
+    collection = db.query(DBCollection).filter(
+        DBCollection.id == collection_id,
+        DBCollection.owner_id == current_user.id
+    ).first()
+    if collection is None:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    update_data = collection_update.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        if value is not None:
+            setattr(collection, field, value)
+    
+    db.commit()
+    db.refresh(collection)
+    return collection
+
+# API Key endpoints
+def generate_api_key():
+    """Generate a secure random API key"""
+    return f"lp_{secrets.token_urlsafe(32)}"
+
+def api_key_to_response(api_key: DBApiKey) -> dict:
+    """Convert DBApiKey to response dict with collection_ids"""
+    return {
+        "id": api_key.id,
+        "name": api_key.name,
+        "key": api_key.key,
+        "is_active": api_key.is_active,
+        "all_collections": api_key.all_collections,
+        "request_count": api_key.request_count or 0,
+        "created_at": api_key.created_at,
+        "last_used_at": api_key.last_used_at,
+        "collection_ids": [c.id for c in api_key.collections]
+    }
+
+@app.post("/api/keys/", response_model=ApiKeyResponse)
+async def create_api_key(
+    api_key_data: ApiKeyCreate,
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user)
+):
+    # Generate unique API key
+    key = generate_api_key()
+    
+    # Create the API key
+    db_api_key = DBApiKey(
+        name=api_key_data.name,
+        key=key,
+        all_collections=api_key_data.all_collections,
+        owner_id=current_user.id
+    )
+    
+    # Add selected collections if not all_collections
+    if not api_key_data.all_collections and api_key_data.collection_ids:
+        collections = db.query(DBCollection).filter(
+            DBCollection.id.in_(api_key_data.collection_ids),
+            DBCollection.owner_id == current_user.id
+        ).all()
+        db_api_key.collections = collections
+    
+    db.add(db_api_key)
+    db.commit()
+    db.refresh(db_api_key)
+    
+    return api_key_to_response(db_api_key)
+
+@app.get("/api/keys/", response_model=List[ApiKeyResponse])
+async def list_api_keys(
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user)
+):
+    api_keys = db.query(DBApiKey).filter(DBApiKey.owner_id == current_user.id).all()
+    return [api_key_to_response(k) for k in api_keys]
+
+@app.get("/api/keys/{key_id}/", response_model=ApiKeyResponse)
+async def get_api_key(
+    key_id: int,
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user)
+):
+    api_key = db.query(DBApiKey).filter(
+        DBApiKey.id == key_id,
+        DBApiKey.owner_id == current_user.id
+    ).first()
+    if api_key is None:
+        raise HTTPException(status_code=404, detail="API key not found")
+    return api_key_to_response(api_key)
+
+@app.put("/api/keys/{key_id}/", response_model=ApiKeyResponse)
+async def update_api_key(
+    key_id: int,
+    api_key_update: ApiKeyUpdate,
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user)
+):
+    api_key = db.query(DBApiKey).filter(
+        DBApiKey.id == key_id,
+        DBApiKey.owner_id == current_user.id
+    ).first()
+    if api_key is None:
+        raise HTTPException(status_code=404, detail="API key not found")
+    
+    # Update simple fields
+    if api_key_update.name is not None:
+        api_key.name = api_key_update.name
+    if api_key_update.is_active is not None:
+        api_key.is_active = api_key_update.is_active
+    if api_key_update.all_collections is not None:
+        api_key.all_collections = api_key_update.all_collections
+    
+    # Update collection associations
+    if api_key_update.collection_ids is not None:
+        collections = db.query(DBCollection).filter(
+            DBCollection.id.in_(api_key_update.collection_ids),
+            DBCollection.owner_id == current_user.id
+        ).all()
+        api_key.collections = collections
+    
+    db.commit()
+    db.refresh(api_key)
+    return api_key_to_response(api_key)
+
+@app.delete("/api/keys/{key_id}/")
+async def delete_api_key(
+    key_id: int,
+    db: Session = Depends(get_db),
+    current_user: DBUser = Depends(get_current_user)
+):
+    api_key = db.query(DBApiKey).filter(
+        DBApiKey.id == key_id,
+        DBApiKey.owner_id == current_user.id
+    ).first()
+    if api_key is None:
+        raise HTTPException(status_code=404, detail="API key not found")
+    db.delete(api_key)
+    db.commit()
+    return {"message": "API key deleted"} 

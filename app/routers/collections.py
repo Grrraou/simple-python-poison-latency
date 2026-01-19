@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from ..core.security import get_current_user
 from ..schemas.collection import Collection, CollectionCreate, CollectionUpdate
+from ..schemas.endpoint import Endpoint
 from ..schemas.user import TokenData
 import uuid
 import logging
@@ -11,8 +12,53 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/collections", tags=["collections"])
 
+# Default fixtures for demo user
+DEMO_USER_EMAIL = "demo@example.com"
+
+DEFAULT_COLLECTIONS = [
+    Collection(
+        id="demo-github-api",
+        name="GitHub API",
+        base_url="https://api.github.com",
+        default_latency_ms=100,
+        default_fail_rate=0.0,
+        user_email=DEMO_USER_EMAIL,
+        endpoints=[
+            Endpoint(id="demo-github-users", path="/users", latency_ms=100, fail_rate=0.0, collection_id="demo-github-api"),
+            Endpoint(id="demo-github-repos", path="/repositories", latency_ms=150, fail_rate=0.05, collection_id="demo-github-api"),
+            Endpoint(id="demo-github-rate-limit", path="/rate_limit", latency_ms=50, fail_rate=0.0, collection_id="demo-github-api"),
+        ]
+    ),
+    Collection(
+        id="demo-jsonplaceholder",
+        name="JSONPlaceholder",
+        base_url="https://jsonplaceholder.typicode.com",
+        default_latency_ms=200,
+        default_fail_rate=0.1,
+        user_email=DEMO_USER_EMAIL,
+        endpoints=[
+            Endpoint(id="demo-jsonplaceholder-posts", path="/posts", latency_ms=200, fail_rate=0.1, collection_id="demo-jsonplaceholder"),
+            Endpoint(id="demo-jsonplaceholder-users", path="/users", latency_ms=250, fail_rate=0.15, collection_id="demo-jsonplaceholder"),
+            Endpoint(id="demo-jsonplaceholder-comments", path="/comments", latency_ms=300, fail_rate=0.1, collection_id="demo-jsonplaceholder"),
+        ]
+    ),
+    Collection(
+        id="demo-httpbin",
+        name="HTTPBin",
+        base_url="https://httpbin.org",
+        default_latency_ms=500,
+        default_fail_rate=0.2,
+        user_email=DEMO_USER_EMAIL,
+        endpoints=[
+            Endpoint(id="demo-httpbin-get", path="/get", latency_ms=500, fail_rate=0.2, collection_id="demo-httpbin"),
+            Endpoint(id="demo-httpbin-delay", path="/delay/1", latency_ms=1000, fail_rate=0.3, collection_id="demo-httpbin"),
+            Endpoint(id="demo-httpbin-status", path="/status/200", latency_ms=100, fail_rate=0.0, collection_id="demo-httpbin"),
+        ]
+    ),
+]
+
 # In-memory storage for collections (replace with database in production)
-collections = {}
+collections = {c.id: c for c in DEFAULT_COLLECTIONS}
 
 @router.post("/", response_model=Collection)
 async def create_collection(
@@ -41,10 +87,13 @@ async def create_collection(
 async def get_collections(current_user: TokenData = Depends(get_current_user)):
     try:
         logger.info(f"Getting collections for user: {current_user.email}")
+        logger.info(f"Available collections: {list(collections.keys())}")
+        logger.info(f"Collection emails: {[c.user_email for c in collections.values()]}")
         user_collections = [
             collection for collection in collections.values()
             if collection.user_email == current_user.email
         ]
+        logger.info(f"Found {len(user_collections)} collections for user {current_user.email}")
         return user_collections
     except Exception as e:
         logger.error(f"Error getting collections: {str(e)}")

@@ -11,8 +11,78 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/endpoints", tags=["endpoints"])
 
+# Default fixtures for demo collections
+DEFAULT_ENDPOINTS = [
+    # GitHub API endpoints
+    Endpoint(
+        id="demo-github-users",
+        path="/users",
+        latency_ms=100,
+        fail_rate=0.0,
+        collection_id="demo-github-api"
+    ),
+    Endpoint(
+        id="demo-github-repos",
+        path="/repositories",
+        latency_ms=150,
+        fail_rate=0.05,
+        collection_id="demo-github-api"
+    ),
+    Endpoint(
+        id="demo-github-rate-limit",
+        path="/rate_limit",
+        latency_ms=50,
+        fail_rate=0.0,
+        collection_id="demo-github-api"
+    ),
+    # JSONPlaceholder endpoints
+    Endpoint(
+        id="demo-jsonplaceholder-posts",
+        path="/posts",
+        latency_ms=200,
+        fail_rate=0.1,
+        collection_id="demo-jsonplaceholder"
+    ),
+    Endpoint(
+        id="demo-jsonplaceholder-users",
+        path="/users",
+        latency_ms=250,
+        fail_rate=0.15,
+        collection_id="demo-jsonplaceholder"
+    ),
+    Endpoint(
+        id="demo-jsonplaceholder-comments",
+        path="/comments",
+        latency_ms=300,
+        fail_rate=0.1,
+        collection_id="demo-jsonplaceholder"
+    ),
+    # HTTPBin endpoints
+    Endpoint(
+        id="demo-httpbin-get",
+        path="/get",
+        latency_ms=500,
+        fail_rate=0.2,
+        collection_id="demo-httpbin"
+    ),
+    Endpoint(
+        id="demo-httpbin-delay",
+        path="/delay/1",
+        latency_ms=1000,
+        fail_rate=0.3,
+        collection_id="demo-httpbin"
+    ),
+    Endpoint(
+        id="demo-httpbin-status",
+        path="/status/200",
+        latency_ms=100,
+        fail_rate=0.0,
+        collection_id="demo-httpbin"
+    ),
+]
+
 # In-memory storage for endpoints (replace with database in production)
-endpoints = {}
+endpoints = {e.id: e for e in DEFAULT_ENDPOINTS}
 
 @router.post("/", response_model=Endpoint)
 async def create_endpoint(

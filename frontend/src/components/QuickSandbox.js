@@ -8,8 +8,6 @@ import {
   Button,
   CircularProgress,
   Alert,
-  Switch,
-  FormControlLabel,
   Grid,
   Tooltip,
   Divider,
@@ -22,7 +20,6 @@ function QuickSandbox() {
     failRate: 0,
     minLatency: 0,
     maxLatency: 1000,
-    sandbox: false,
   });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -56,12 +53,6 @@ function QuickSandbox() {
     }
   };
 
-  const handleSwitchChange = (event) => {
-    setFormData({
-      ...formData,
-      sandbox: event.target.checked,
-    });
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -77,8 +68,9 @@ function QuickSandbox() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
+      // Use Go API sandbox endpoint with its parameter naming convention
       const response = await fetch(
-        `${API_ENDPOINTS.PROXY}?url=${encodeURIComponent(formData.url)}&fail_rate=${failRateDecimal}&min_latency=${formData.minLatency}&max_latency=${formData.maxLatency}&sandbox=${formData.sandbox}`,
+        `${API_ENDPOINTS.SANDBOX}?url=${encodeURIComponent(formData.url)}&failrate=${failRateDecimal}&minLatency=${formData.minLatency}&maxLatency=${formData.maxLatency}`,
         {
           headers: {
             'Accept': 'application/json',
@@ -221,31 +213,6 @@ function QuickSandbox() {
                   valueLabelDisplay="auto"
                 />
               </Box>
-            </Tooltip>
-          </Box>
-
-          <Divider sx={{ my: 3 }} />
-
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Sandbox Mode
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              When enabled, sandbox mode simulates API responses without making actual requests to the target URL.
-              This is useful for testing latency and failure scenarios without affecting real APIs or requiring internet access.
-            </Typography>
-            <Tooltip title="Enable sandbox mode to test without making real API calls">
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.sandbox}
-                    onChange={handleSwitchChange}
-                    name="sandbox"
-                    color="primary"
-                  />
-                }
-                label="Sandbox Mode"
-              />
             </Tooltip>
           </Box>
 

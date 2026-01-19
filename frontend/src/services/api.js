@@ -100,6 +100,19 @@ export const deleteCollection = async (collectionId) => {
   return handleResponse(response);
 };
 
+export const updateCollection = async (collectionId, collectionData) => {
+  const response = await fetch(`${API_ENDPOINTS.COLLECTIONS}/${collectionId}/`, {
+    method: 'PUT',
+    headers: {
+      ...getAuthHeader(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(collectionData),
+  });
+
+  return handleResponse(response);
+};
+
 // Endpoint functions
 export const fetchEndpoints = async (collectionId) => {
   const response = await fetch(`${API_ENDPOINTS.COLLECTIONS}/${collectionId}/endpoints/`, {
@@ -136,6 +149,50 @@ export const updateEndpoint = async (endpointId, endpointData) => {
 
 export const deleteEndpoint = async (endpointId) => {
   const response = await fetch(`${API_ENDPOINTS.ENDPOINTS}/${endpointId}/`, {
+    method: 'DELETE',
+    headers: getAuthHeader(),
+  });
+
+  return handleResponse(response);
+};
+
+// API Key functions
+export const fetchApiKeys = async () => {
+  const response = await fetch(`${API_ENDPOINTS.API_KEYS}/`, {
+    headers: getAuthHeader(),
+  });
+
+  return handleResponse(response);
+};
+
+export const createApiKey = async (keyData) => {
+  const response = await fetch(`${API_ENDPOINTS.API_KEYS}/`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeader(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(keyData),
+  });
+
+  return handleResponse(response);
+};
+
+export const updateApiKey = async (keyId, keyData) => {
+  const response = await fetch(`${API_ENDPOINTS.API_KEYS}/${keyId}/`, {
+    method: 'PUT',
+    headers: {
+      ...getAuthHeader(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(keyData),
+  });
+
+  return handleResponse(response);
+};
+
+export const deleteApiKey = async (keyId) => {
+  const response = await fetch(`${API_ENDPOINTS.API_KEYS}/${keyId}/`, {
     method: 'DELETE',
     headers: getAuthHeader(),
   });

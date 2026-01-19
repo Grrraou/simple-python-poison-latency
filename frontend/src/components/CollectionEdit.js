@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   Container,
   Paper,
@@ -19,6 +19,9 @@ import {
   Alert,
   Slider,
   Grid,
+  Switch,
+  Chip,
+  Tooltip,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -26,7 +29,6 @@ import { fetchCollection, fetchEndpoints, createEndpoint, updateEndpoint, delete
 
 function CollectionEdit() {
   const { collectionId } = useParams();
-  const navigate = useNavigate();
   const [collection, setCollection] = useState(null);
   const [endpoints, setEndpoints] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -94,14 +96,17 @@ function CollectionEdit() {
 
   const handleEditEndpoint = async () => {
     try {
-      if (!editingEndpoint.path.trim()) {
-        setError('Path cannot be empty');
+      if (!editingEndpoint.name.trim()) {
+        setError('Name cannot be empty');
         return;
       }
 
       const updatedEndpoint = await updateEndpoint(editingEndpoint.id, {
-        path: editingEndpoint.path,
-        latency_ms: editingEndpoint.latency_ms,
+        name: editingEndpoint.name,
+        url: editingEndpoint.url,
+        method: editingEndpoint.method,
+        min_latency: editingEndpoint.min_latency,
+        max_latency: editingEndpoint.max_latency,
         fail_rate: editingEndpoint.fail_rate,
       });
 
@@ -126,6 +131,25 @@ function CollectionEdit() {
     }
   };
 
+  const handleToggleEndpointActive = async (endpoint) => {
+    try {
+      const updatedEndpoint = await updateEndpoint(endpoint.id, {
+        is_active: !endpoint.is_active
+      });
+      setEndpoints(endpoints.map(e => 
+        e.id === updatedEndpoint.id ? updatedEndpoint : e
+      ));
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const formatNumber = (num) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return (num || 0).toString();
+  };
+
   if (!collection) {
     return <Box>Loading...</Box>;
   }
@@ -139,12 +163,11 @@ function CollectionEdit() {
               <Typography variant="h4" component="h1">
                 {collection.name}
               </Typography>
-              <Typography variant="body1" color="text.secondary">
-                {collection.base_url}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Default Latency: {collection.default_latency_ms}ms | Fail Rate: {collection.default_fail_rate}%
-              </Typography>
+              {collection.description && (
+                <Typography variant="body1" color="text.secondary">
+                  {collection.description}
+                </Typography>
+              )}
             </Box>
             <Button
               variant="contained"
@@ -159,38 +182,76 @@ function CollectionEdit() {
             {endpoints.map((endpoint) => (
               <ListItem
                 key={endpoint.id}
+                sx={{
+                  opacity: endpoint.is_active === false ? 0.6 : 1,
+                  borderLeft: endpoint.is_active === false ? '3px solid grey' : '3px solid #90caf9',
+                  mb: 1,
+                  bgcolor: 'background.paper',
+                }}
                 secondaryAction={
-                  <Box>
-                    <IconButton
-                      edge="end"
-                      aria-label="edit"
-                      onClick={() => {
-                        setEditingEndpoint({ ...endpoint });
-                        setEditDialog(true);
-                      }}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      edge="end"
-                      aria-label="delete"
-                      onClick={() => handleDeleteEndpoint(endpoint.id)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Tooltip title={endpoint.is_active ? "Deactivate" : "Activate"}>
+                      <Switch
+                        checked={endpoint.is_active !== false}
+                        onChange={() => handleToggleEndpointActive(endpoint)}
+                        color="primary"
+                        size="small"
+                      />
+                    </Tooltip>
+                    <Tooltip title="Edit">
+                      <IconButton
+                        edge="end"
+                        aria-label="edit"
+                        onClick={() => {
+                          setEditingEndpoint({ ...endpoint });
+                          setEditDialog(true);
+                        }}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton
+                        edge="end"
+                        aria-label="delete"
+                        onClick={() => handleDeleteEndpoint(endpoint.id)}
+                        color="error"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
                   </Box>
                 }
               >
                 <ListItemText
-                  primary={endpoint.path}
+                  primary={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="subtitle1">{endpoint.name}</Typography>
+                      {endpoint.is_active === false && (
+                        <Chip label="Inactive" size="small" color="default" />
+                      )}
+                      <Tooltip title="Total requests">
+                        <Chip 
+                          label={`${formatNumber(endpoint.request_count)} requests`} 
+                          size="small" 
+                          color="info" 
+                          variant="outlined"
+                        />
+                      </Tooltip>
+                    </Box>
+                  }
                   secondary={
                     <>
+                      <Typography component="span" variant="body2" color="text.secondary">
+                        {endpoint.method} {endpoint.url}
+                      </Typography>
+                      <br />
                       <Typography component="span" variant="body2" color="text.primary">
-                        Latency: {endpoint.latency_ms !== null ? `${endpoint.latency_ms}ms` : 'Default'}
+                        Latency: {endpoint.min_latency}-{endpoint.max_latency}ms
                       </Typography>
                       {' — '}
                       <Typography component="span" variant="body2" color="text.primary">
-                        Fail Rate: {endpoint.fail_rate !== null ? `${endpoint.fail_rate}%` : 'Default'}
+                        Fail Rate: {endpoint.fail_rate}%
                       </Typography>
                     </>
                   }
@@ -277,26 +338,55 @@ function CollectionEdit() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={editDialog} onClose={() => setEditDialog(false)}>
-        <DialogTitle>Edit Path</DialogTitle>
+      <Dialog open={editDialog} onClose={() => setEditDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Endpoint</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
               <TextField
                 autoFocus
                 margin="dense"
-                label="Path"
+                label="Name"
                 fullWidth
-                value={editingEndpoint?.path || ''}
-                onChange={(e) => setEditingEndpoint({ ...editingEndpoint, path: e.target.value })}
-                placeholder="/api/users"
+                value={editingEndpoint?.name || ''}
+                onChange={(e) => setEditingEndpoint({ ...editingEndpoint, name: e.target.value })}
+                placeholder="User API"
               />
             </Grid>
+            <Grid item xs={12}>
+              <TextField
+                margin="dense"
+                label="URL"
+                fullWidth
+                value={editingEndpoint?.url || ''}
+                onChange={(e) => setEditingEndpoint({ ...editingEndpoint, url: e.target.value })}
+                placeholder="https://api.example.com/users"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                margin="dense"
+                label="Method"
+                fullWidth
+                select
+                value={editingEndpoint?.method || 'GET'}
+                onChange={(e) => setEditingEndpoint({ ...editingEndpoint, method: e.target.value })}
+                SelectProps={{
+                  native: true,
+                }}
+              >
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
+              </TextField>
+            </Grid>
             <Grid item xs={6}>
-              <Typography gutterBottom>Latency (ms)</Typography>
+              <Typography gutterBottom>Min Latency (ms): {editingEndpoint?.min_latency || 0}</Typography>
               <Slider
-                value={editingEndpoint?.latency_ms ?? collection.default_latency_ms}
-                onChange={(e, value) => setEditingEndpoint({ ...editingEndpoint, latency_ms: value })}
+                value={editingEndpoint?.min_latency || 0}
+                onChange={(e, value) => setEditingEndpoint({ ...editingEndpoint, min_latency: value })}
                 min={0}
                 max={10000}
                 step={100}
@@ -304,9 +394,20 @@ function CollectionEdit() {
               />
             </Grid>
             <Grid item xs={6}>
-              <Typography gutterBottom>Fail Rate (%)</Typography>
+              <Typography gutterBottom>Max Latency (ms): {editingEndpoint?.max_latency || 1000}</Typography>
               <Slider
-                value={editingEndpoint?.fail_rate ?? collection.default_fail_rate}
+                value={editingEndpoint?.max_latency || 1000}
+                onChange={(e, value) => setEditingEndpoint({ ...editingEndpoint, max_latency: value })}
+                min={0}
+                max={10000}
+                step={100}
+                valueLabelDisplay="auto"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Typography gutterBottom>Fail Rate (%): {editingEndpoint?.fail_rate || 0}</Typography>
+              <Slider
+                value={editingEndpoint?.fail_rate || 0}
                 onChange={(e, value) => setEditingEndpoint({ ...editingEndpoint, fail_rate: value })}
                 min={0}
                 max={100}

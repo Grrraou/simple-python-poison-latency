@@ -39,6 +39,9 @@ function Navbar({ user, setUser }) {
               <Button color="inherit" component={RouterLink} to="/endpoints">
                 Endpoints
               </Button>
+              <Button color="inherit" component={RouterLink} to="/api-keys">
+                API Keys
+              </Button>
               <Button color="inherit" onClick={handleLogout}>
                 Logout
               </Button>
