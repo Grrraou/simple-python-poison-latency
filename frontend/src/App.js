@@ -13,6 +13,8 @@ import Dashboard from './components/Dashboard';
 import QuickSandbox from './components/QuickSandbox';
 import CollectionEdit from './components/CollectionEdit';
 import ApiKeys from './components/ApiKeys';
+import Landing from './components/Landing';
+import Documentation from './components/Documentation';
 import { UserProvider } from './contexts/UserContext';
 
 // Create a theme
@@ -27,6 +29,38 @@ const theme = createTheme({
     },
   },
 });
+
+// Private route wrapper
+function PrivateRoute({ user, children }) {
+  return user ? children : <Navigate to="/login" />;
+}
+
+function AppContent({ user, setUser }) {
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <Navbar user={user} setUser={setUser} />
+      <Box component="main" sx={{ flexGrow: 1 }}>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/dashboard" />} />
+          <Route path="/register" element={!user ? <Register setUser={setUser} /> : <Navigate to="/dashboard" />} />
+          <Route path="/sandbox" element={<QuickSandbox />} />
+          <Route path="/docs" element={<Documentation />} />
+          
+          {/* Private routes */}
+          <Route path="/dashboard" element={<PrivateRoute user={user}><Dashboard /></PrivateRoute>} />
+          <Route path="/endpoints" element={<PrivateRoute user={user}><Endpoints /></PrivateRoute>} />
+          <Route path="/api-keys" element={<PrivateRoute user={user}><ApiKeys /></PrivateRoute>} />
+          <Route path="/collections/:collectionId" element={<PrivateRoute user={user}><CollectionEdit /></PrivateRoute>} />
+          
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Box>
+    </Box>
+  );
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -50,23 +84,10 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <UserProvider>
-        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-          <Navbar user={user} setUser={setUser} />
-          <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-            <Routes>
-              <Route path="/" element={user ? <Dashboard /> : <Navigate to="/login" />} />
-              <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
-              <Route path="/register" element={!user ? <Register setUser={setUser} /> : <Navigate to="/" />} />
-              <Route path="/endpoints" element={user ? <Endpoints /> : <Navigate to="/login" />} />
-              <Route path="/sandbox" element={user ? <QuickSandbox /> : <Navigate to="/login" />} />
-              <Route path="/api-keys" element={user ? <ApiKeys /> : <Navigate to="/login" />} />
-              <Route path="/collections/:collectionId" element={<CollectionEdit />} />
-            </Routes>
-          </Box>
-        </Box>
+        <AppContent user={user} setUser={setUser} />
       </UserProvider>
     </ThemeProvider>
   );
 }
 
-export default App; 
+export default App;

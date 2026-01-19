@@ -17,20 +17,30 @@ function Navbar({ user, setUser }) {
   return (
     <AppBar position="static">
       <Toolbar>
-        <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+        <Box 
+          component={RouterLink} 
+          to="/"
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            flexGrow: 1, 
+            textDecoration: 'none', 
+            color: 'inherit' 
+          }}
+        >
           <img
             src="/icon.png"
             alt="Latency Poison Logo"
             style={{ height: '40px', marginRight: '16px' }}
           />
-          <Typography variant="h6" component="div">
+          <Typography variant="h6">
             Latency Poison
           </Typography>
         </Box>
         <Box>
           {user ? (
             <>
-              <Button color="inherit" component={RouterLink} to="/">
+              <Button color="inherit" component={RouterLink} to="/dashboard">
                 Dashboard
               </Button>
               <Button color="inherit" component={RouterLink} to="/sandbox">
@@ -42,17 +52,35 @@ function Navbar({ user, setUser }) {
               <Button color="inherit" component={RouterLink} to="/api-keys">
                 API Keys
               </Button>
+              <Button color="inherit" component={RouterLink} to="/docs">
+                Docs
+              </Button>
               <Button color="inherit" onClick={handleLogout}>
                 Logout
               </Button>
             </>
           ) : (
             <>
+              <Button color="inherit" component={RouterLink} to="/">
+                Home
+              </Button>
+              <Button color="inherit" component={RouterLink} to="/docs">
+                Docs
+              </Button>
+              <Button color="inherit" component={RouterLink} to="/sandbox">
+                Sandbox
+              </Button>
               <Button color="inherit" component={RouterLink} to="/login">
                 Login
               </Button>
-              <Button color="inherit" component={RouterLink} to="/register">
-                Register
+              <Button 
+                variant="outlined" 
+                color="inherit" 
+                component={RouterLink} 
+                to="/register"
+                sx={{ ml: 1 }}
+              >
+                Sign Up
               </Button>
             </>
           )}
@@ -62,4 +90,4 @@ function Navbar({ user, setUser }) {
   );
 }
 
-export default Navbar; 
+export default Navbar;
