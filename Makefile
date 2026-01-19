@@ -1,4 +1,36 @@
-.PHONY: dev build clean test help frontend api proxy mysql
+.PHONY: dev build clean test help frontend api proxy mysql init
+
+# Load .env file if it exists
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
+
+# Default values (can be overridden by .env)
+DATABASE_HOST ?= localhost
+DATABASE_PORT ?= 3306
+DATABASE_USER ?= latencypoison
+DATABASE_PASSWORD ?= latencypoison
+DATABASE_NAME ?= latencypoison
+MYSQL_ROOT_PASSWORD ?= rootpassword
+API_PORT ?= 8000
+PROXY_PORT ?= 8080
+FRONTEND_PORT ?= 3000
+PHPMYADMIN_PORT ?= 8081
+
+# =============================================================================
+# SETUP
+# =============================================================================
+
+# Initialize project (copy .env.example to .env if not exists)
+init:
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo "Created .env file from .env.example"; \
+		echo "Please review and update the values in .env"; \
+	else \
+		echo ".env file already exists"; \
+	fi
 
 # =============================================================================
 # FULL STACK (Docker Compose)
@@ -44,11 +76,11 @@ mysql:
 
 # Connect to MySQL CLI
 mysql-cli:
-	docker-compose exec mysql mysql -u latencypoison -platencypoison latencypoison
+	docker-compose exec mysql mysql -u $(DATABASE_USER) -p$(DATABASE_PASSWORD) $(DATABASE_NAME)
 
 # MySQL root CLI
 mysql-root:
-	docker-compose exec mysql mysql -u root -prootpassword
+	docker-compose exec mysql mysql -u root -p$(MYSQL_ROOT_PASSWORD)
 
 # Reset database (removes all data)
 mysql-reset:
@@ -74,14 +106,14 @@ frontend-install:
 
 # --- Python API ---
 api-dev:
-	cd api && DATABASE_URL=mysql+pymysql://latencypoison:latencypoison@localhost:3306/latencypoison uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+	cd api && DATABASE_URL=mysql+pymysql://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME) uvicorn main:app --host 0.0.0.0 --port $(API_PORT) --reload
 
 api-init:
-	cd api && DATABASE_URL=mysql+pymysql://latencypoison:latencypoison@localhost:3306/latencypoison python init_db.py
+	cd api && DATABASE_URL=mysql+pymysql://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME) python init_db.py
 
 # --- Go Proxy ---
 proxy-dev:
-	cd proxy && DATABASE_HOST=localhost DATABASE_PORT=3306 DATABASE_USER=latencypoison DATABASE_PASSWORD=latencypoison DATABASE_NAME=latencypoison PORT=8080 go run ./cmd/server
+	cd proxy && DATABASE_HOST=$(DATABASE_HOST) DATABASE_PORT=$(DATABASE_PORT) DATABASE_USER=$(DATABASE_USER) DATABASE_PASSWORD=$(DATABASE_PASSWORD) DATABASE_NAME=$(DATABASE_NAME) PORT=$(PROXY_PORT) go run ./cmd/server
 
 proxy-build:
 	cd proxy && go build -o bin/latency-poison-proxy ./cmd/server
@@ -119,6 +151,9 @@ test-proxy:
 help:
 	@echo "Latency Poison - The Chaos Proxy"
 	@echo ""
+	@echo "SETUP:"
+	@echo "  make init          - Create .env from .env.example (first time setup)"
+	@echo ""
 	@echo "FULL STACK (Docker Compose):"
 	@echo "  make dev           - Start all services (frontend, api, proxy, mysql)"
 	@echo "  make dev-bg        - Start all services in background"
@@ -135,9 +170,9 @@ help:
 	@echo "  make mysql-reset   - Reset database (removes all data)"
 	@echo ""
 	@echo "INDIVIDUAL SERVICES (for local development):"
-	@echo "  make frontend-dev  - Start frontend dev server (port 3000)"
-	@echo "  make api-dev       - Start Python API (port 8000)"
-	@echo "  make proxy-dev     - Start Go proxy (port 8080)"
+	@echo "  make frontend-dev  - Start frontend dev server"
+	@echo "  make api-dev       - Start Python API"
+	@echo "  make proxy-dev     - Start Go proxy"
 	@echo ""
 	@echo "  make frontend-install - Install frontend dependencies"
 	@echo "  make api-init         - Initialize database"
@@ -152,10 +187,14 @@ help:
 	@echo "  make test          - Run Python API tests"
 	@echo "  make test-proxy    - Run Go proxy tests"
 	@echo ""
-	@echo "URLs when running:"
-	@echo "  Frontend:    http://localhost:3000"
-	@echo "  API:         http://localhost:8000"
-	@echo "  Proxy:       http://localhost:8080"
-	@echo "  phpMyAdmin:  http://localhost:8081"
+	@echo "CONFIGURATION:"
+	@echo "  Copy .env.example to .env and customize values"
+	@echo "  Or run 'make init' to create .env automatically"
+	@echo ""
+	@echo "URLs when running (defaults, configurable in .env):"
+	@echo "  Frontend:    http://localhost:$(FRONTEND_PORT)"
+	@echo "  API:         http://localhost:$(API_PORT)"
+	@echo "  Proxy:       http://localhost:$(PROXY_PORT)"
+	@echo "  phpMyAdmin:  http://localhost:$(PHPMYADMIN_PORT)"
 
 .DEFAULT_GOAL := help

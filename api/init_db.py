@@ -5,6 +5,12 @@ import secrets
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Admin user configuration from environment variables
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+ADMIN_FULL_NAME = os.getenv("ADMIN_FULL_NAME", "Administrator")
+
 def init_db():
     # Create all tables (MySQL handles its own storage)
     Base.metadata.create_all(bind=engine)
@@ -13,35 +19,35 @@ def init_db():
     db = SessionLocal()
     
     try:
-        # Check if demo user already exists
-        demo_user = db.query(User).filter(User.username == "demo").first()
-        if not demo_user:
-            # Create demo user
-            demo_user = User(
-                username="demo",
-                email="demo@example.com",
-                full_name="Demo User",
-                hashed_password=pwd_context.hash("demo123"),
+        # Check if admin user already exists
+        admin_user = db.query(User).filter(User.username == ADMIN_USERNAME).first()
+        if not admin_user:
+            # Create admin user
+            admin_user = User(
+                username=ADMIN_USERNAME,
+                email=ADMIN_EMAIL,
+                full_name=ADMIN_FULL_NAME,
+                hashed_password=pwd_context.hash(ADMIN_PASSWORD),
                 disabled=False
             )
-            db.add(demo_user)
+            db.add(admin_user)
             db.commit()
-            db.refresh(demo_user)
-            print("Demo user created successfully")
-            print("Username: demo")
-            print("Password: demo123")
+            db.refresh(admin_user)
+            print("Admin user created successfully")
+            print(f"Username: {ADMIN_USERNAME}")
+            print(f"Password: {ADMIN_PASSWORD}")
             
-            # Create default collections for demo user
-            create_demo_fixtures(db, demo_user.id)
+            # Create default collections for admin user
+            create_demo_fixtures(db, admin_user.id)
         else:
-            print("Demo user already exists")
+            print(f"Admin user '{ADMIN_USERNAME}' already exists")
             # Check if collections exist, create them if not
-            existing_collections = db.query(Collection).filter(Collection.owner_id == demo_user.id).count()
+            existing_collections = db.query(Collection).filter(Collection.owner_id == admin_user.id).count()
             if existing_collections == 0:
                 print("Creating demo collections...")
-                create_demo_fixtures(db, demo_user.id)
+                create_demo_fixtures(db, admin_user.id)
     except Exception as e:
-        print(f"Error creating demo user: {e}")
+        print(f"Error creating admin user: {e}")
         db.rollback()
     finally:
         db.close()

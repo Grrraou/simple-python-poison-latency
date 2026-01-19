@@ -4,12 +4,19 @@
 BINARY_NAME=latency-poison-proxy
 DOCKER_IMAGE=latency-poison-proxy:latest
 
+# Load .env file from parent directory if it exists
+ifneq (,$(wildcard ../.env))
+    include ../.env
+    export
+endif
+
 # Database defaults (for local development)
 DATABASE_HOST ?= localhost
 DATABASE_PORT ?= 3306
 DATABASE_USER ?= latencypoison
 DATABASE_PASSWORD ?= latencypoison
 DATABASE_NAME ?= latencypoison
+PORT ?= 8080
 
 # Build the application
 build:
@@ -22,7 +29,7 @@ run:
 	DATABASE_USER=$(DATABASE_USER) \
 	DATABASE_PASSWORD=$(DATABASE_PASSWORD) \
 	DATABASE_NAME=$(DATABASE_NAME) \
-	PORT=8080 \
+	PORT=$(PORT) \
 	go run ./cmd/server
 
 # Run tests
