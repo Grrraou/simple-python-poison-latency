@@ -61,6 +61,7 @@ services:
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - ADMIN_FULL_NAME=${ADMIN_FULL_NAME:-Administrator}
+      - DEFAULT_API_KEY=${DEFAULT_API_KEY:-lp_default_admin_key_change_in_production}
     volumes:
       - ./api:/app
     depends_on:

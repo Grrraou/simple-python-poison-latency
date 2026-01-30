@@ -50,27 +50,21 @@ func main() {
 	// Initialize handlers with MySQL database
 	handler := handlers.NewHandler(logger, mysqlClient.GetDB())
 
-	// Register routes
-	// Sandbox endpoint - no auth required, for quick testing
 	app.Get("/sandbox", handler.SandboxHandler)
-
-	// Proxy endpoint - requires API key, uses database configuration
-	app.All("/proxy/:collectionId/*", handler.ProxyHandler)
-
-	// Health check endpoint
 	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status": "ok",
-		})
+		return c.JSON(fiber.Map{"status": "ok"})
 	})
+	// Config proxy: /{apiKey} or /{apiKey}/* -> one key -> one target URL + chaos
+	app.All("/:apiKey", handler.ConfigKeyProxyHandler)
+	app.All("/:apiKey/*", handler.ConfigKeyProxyHandler)
 
-	// Start server
+	// Start API server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	logger.Info("Starting server", zap.String("port", port))
+	logger.Info("Starting API server", zap.String("port", port))
 	if err := app.Listen(":" + port); err != nil {
 		logger.Fatal("Failed to start server", zap.Error(err))
 	}

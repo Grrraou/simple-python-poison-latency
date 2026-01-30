@@ -17,12 +17,13 @@ API_PORT ?= 8000
 PROXY_PORT ?= 8080
 FRONTEND_PORT ?= 3000
 PHPMYADMIN_PORT ?= 8081
+DEFAULT_API_KEY ?= lp_default_admin_key_change_in_production
 
 # =============================================================================
 # SETUP
 # =============================================================================
 
-# Initialize project (copy .env.example to .env if not exists)
+# Initialize project (copy .env.example to .env if not exists). Then run make dev.
 init:
 	@if [ ! -f .env ]; then \
 		cp .env.example .env; \
@@ -31,6 +32,11 @@ init:
 	else \
 		echo ".env file already exists"; \
 	fi
+	@echo "Next: make build && make dev"
+
+# Initialize database (create tables + fixtures). Runs inside API container when using make dev; use this for local DB.
+init-db:
+	docker-compose run --rm api python init_db.py
 
 # =============================================================================
 # FULL STACK (Docker Compose)
@@ -65,6 +71,22 @@ stop:
 restart:
 	docker-compose down
 	docker-compose up -d
+
+# =============================================================================
+# CONFIG PROXY (main feature)
+# =============================================================================
+# Test the config proxy (requires make dev or dev-bg). Uses DEFAULT_API_KEY from .env.
+config-proxy-test:
+	@echo "Testing config proxy at http://localhost:$(PROXY_PORT)/v2"
+	@echo "Using API key from DEFAULT_API_KEY in .env"
+	curl -s -o /dev/null -w "%%{http_code}" "http://localhost:$(PROXY_PORT)/$(DEFAULT_API_KEY)/" && echo " OK" || echo " (start stack with make dev)"
+
+# Example: call config proxy with custom key and URL (usage: make config-proxy-call URL=https://api.github.com/users KEY=lp_xxx)
+# Usage: make config-proxy-call KEY=lp_xxx PROXY_PATH=/users
+config-proxy-call:
+	@key="$(KEY)"; [ -z "$$key" ] && key="$(DEFAULT_API_KEY)"; \
+	path="$(PROXY_PATH)"; [ -z "$$path" ] && path=""; \
+	curl -v "http://localhost:$(PROXY_PORT)/$$key$$path"
 
 # =============================================================================
 # DATABASE (MySQL)
@@ -151,15 +173,22 @@ test-proxy:
 help:
 	@echo "Latency Poison - The Chaos Proxy"
 	@echo ""
-	@echo "SETUP:"
-	@echo "  make init          - Create .env from .env.example (first time setup)"
+	@echo "SETUP (use Makefile):"
+	@echo "  make init          - Create .env from .env.example"
+	@echo "  make build         - Build Docker images"
+	@echo "  make dev           - Start all services"
+	@echo "  make init-db       - Run DB migrations + fixtures (optional if using make dev)"
 	@echo ""
-	@echo "FULL STACK (Docker Compose):"
-	@echo "  make dev           - Start all services (frontend, api, proxy, mysql)"
-	@echo "  make dev-bg        - Start all services in background"
-	@echo "  make build         - Build all Docker images"
+	@echo "CONFIG PROXY (main feature: /{apiKey}/path):"
+	@echo "  make config-proxy-test  - Quick test (uses DEFAULT_API_KEY)"
+	@echo "  make config-proxy-call KEY=lp_xxx PATH=/users  - Call proxy with key and path"
+	@echo ""
+	@echo "FULL STACK:"
+	@echo "  make dev           - Start all services"
+	@echo "  make dev-bg        - Start in background"
+	@echo "  make build         - Build all images"
 	@echo "  make clean         - Stop and remove containers/volumes"
-	@echo "  make logs          - View logs from all services"
+	@echo "  make logs          - View logs"
 	@echo "  make stop          - Stop all services"
 	@echo "  make restart       - Restart all services"
 	@echo ""
@@ -179,9 +208,9 @@ help:
 	@echo "  make proxy-build      - Build Go proxy binary"
 	@echo ""
 	@echo "DOCKER INDIVIDUAL:"
-	@echo "  make docker-frontend - Build frontend image only"
-	@echo "  make docker-api      - Build Python API image only"
-	@echo "  make docker-proxy    - Build Go proxy image only"
+	@echo "  make docker-frontend  - Build frontend image only"
+	@echo "  make docker-api       - Build Python API image only"
+	@echo "  make docker-proxy     - Build Go proxy image only"
 	@echo ""
 	@echo "TESTING:"
 	@echo "  make test          - Run Python API tests"
@@ -192,9 +221,9 @@ help:
 	@echo "  Or run 'make init' to create .env automatically"
 	@echo ""
 	@echo "URLs when running (defaults, configurable in .env):"
-	@echo "  Frontend:    http://localhost:$(FRONTEND_PORT)"
-	@echo "  API:         http://localhost:$(API_PORT)"
-	@echo "  Proxy:       http://localhost:$(PROXY_PORT)"
-	@echo "  phpMyAdmin:  http://localhost:$(PHPMYADMIN_PORT)"
+	@echo "  Frontend:       http://localhost:$(FRONTEND_PORT)"
+	@echo "  API:            http://localhost:$(API_PORT)"
+	@echo "  Config proxy:   http://localhost:$(PROXY_PORT)/{your_key}/path (main feature, use Configs page)"
+	@echo "  phpMyAdmin:     http://localhost:$(PHPMYADMIN_PORT)"
 
 .DEFAULT_GOAL := help

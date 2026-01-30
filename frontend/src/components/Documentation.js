@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -15,17 +16,19 @@ import {
   AccordionSummary,
   AccordionDetails,
   Alert,
-  Chip,
-  Stack,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
   Code as CodeIcon,
   Settings as SettingsIcon,
-  Dns as DnsIcon,
   Api as ApiIcon,
-  Security as SecurityIcon,
   Dashboard as DashboardIcon,
+  Security as SecurityIcon,
 } from '@mui/icons-material';
 import { PROXY_API_BASE_URL } from '../config';
 
@@ -57,9 +60,9 @@ function CodeBlock({ children, title }) {
   );
 }
 
-function Section({ icon: Icon, title, children }) {
+function Section({ icon: Icon, title, children, id }) {
   return (
-    <Box sx={{ mb: 6 }}>
+    <Box sx={{ mb: 6 }} id={id}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
         <Icon sx={{ mr: 2, color: 'primary.main', fontSize: 28 }} />
         <Typography variant="h4">{title}</Typography>
@@ -69,8 +72,37 @@ function Section({ icon: Icon, title, children }) {
   );
 }
 
+const sections = [
+  { id: 'how-it-works', title: 'How It Works', icon: ApiIcon },
+  { id: 'config-setup', title: 'Config Setup', icon: DashboardIcon },
+  { id: 'api-reference', title: 'API Reference', icon: CodeIcon },
+  { id: 'examples', title: 'Examples', icon: SettingsIcon },
+  { id: 'mitm-proxy', title: 'MITM Proxy (Browser)', icon: SecurityIcon },
+  { id: 'security', title: 'Security', icon: SecurityIcon },
+];
+
 function Documentation() {
   const proxyBaseUrl = PROXY_API_BASE_URL || 'http://localhost:8080';
+  const location = useLocation();
+  const displayApiKey = 'lp_your_key_from_configs_page';
+  const mitmProxyUrl = (proxyBaseUrl && typeof window !== 'undefined') ? new URL(proxyBaseUrl).hostname + ':9090' : 'localhost:9090';
+
+  // Scroll to section if hash is present
+  React.useEffect(() => {
+    if (location.hash) {
+      const element = document.getElementById(location.hash.slice(1));
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [location]);
+
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <Box sx={{ py: 4 }}>
@@ -81,189 +113,80 @@ function Documentation() {
             Documentation
           </Typography>
           <Typography variant="h6" color="text.secondary">
-            Learn how to configure and integrate Latency Poison into your development workflow
+            One key → one target URL. Call https://proxy:port/your_api_key (path appended to target URL).
           </Typography>
         </Box>
 
-        {/* How It Works */}
-        <Section icon={ApiIcon} title="How It Works">
-          <Typography variant="body1" paragraph>
-            Latency Poison acts as a proxy between your application and external APIs. Instead of calling 
-            the target API directly, you call Latency Poison with the target URL as a parameter:
+        {/* Quick Links / Table of Contents */}
+        <Paper elevation={2} sx={{ mb: 6, p: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Quick Links
           </Typography>
-          
+          <List dense sx={{ display: 'flex', flexWrap: 'wrap' }}>
+            {sections.map((section) => (
+              <ListItem key={section.id} sx={{ width: { xs: '100%', sm: '50%', md: '33.33%' }, py: 0.5 }}>
+                <ListItemButton onClick={() => scrollToSection(section.id)} sx={{ borderRadius: 1 }}>
+                  <ListItemIcon sx={{ minWidth: 36 }}>
+                    <section.icon fontSize="small" color="primary" />
+                  </ListItemIcon>
+                  <ListItemText primary={section.title} primaryTypographyProps={{ variant: 'body2' }} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Paper>
+
+        {/* How It Works */}
+        <Section icon={ApiIcon} title="How It Works" id="how-it-works">
+          <Typography variant="body1" paragraph>
+            <strong>One config key → one target URL.</strong> Each key has an API key (<code>lp_...</code>), a single target URL (e.g. <code>https://api.github.com</code>), and chaos settings (fail rate, latency, error codes).
+          </Typography>
           <Alert severity="info" sx={{ mb: 3 }}>
             <strong>Without Latency Poison:</strong><br />
             <code>curl https://api.github.com/users</code>
             <br /><br />
-            <strong>With Latency Poison:</strong><br />
-            <code>curl "{proxyBaseUrl}/proxy/1?api_key=lp_xxx&url=https://api.github.com/users"</code>
+            <strong>With Latency Poison:</strong> Put the proxy URL with your key in the path. Path is appended to the key’s target URL.<br />
+            <code>curl "{proxyBaseUrl}/{displayApiKey}/users"</code>
           </Alert>
-
           <Typography variant="body1" paragraph>
-            The proxy applies your configured latency and failure settings, then forwards the request to the 
-            real API. Your application receives the response as if it came directly from the target API.
+            The proxy looks up the key from the path, applies latency and fail rate, then forwards to <strong>target_url + path</strong>.
           </Typography>
-
           <CodeBlock title="Flow">
-{`Your App                         Latency Poison                      Real API
-    |                                   |                                  |
-    |-- GET /proxy/1?url=github.com --> |                                  |
-    |                                   |                                  |
-    |                              [add latency]                           |
-    |                              [maybe fail]                            |
-    |                                   |                                  |
-    |                                   |-- GET github.com/users --------->|
-    |                                   |                                  |
-    |                                   |<-------- response ---------------|
-    |                                   |                                  |
-    |<-------- response ----------------|                                  |`}
+{`Your App                         Latency Poison                         Real API
+    |                                   |                                       |
+    |-- GET /{displayApiKey}/users ----->|                                       |
+    |                                   | [lookup key, add latency]              |
+    |                                   | [maybe fail]                           |
+    |                                   |-- GET target_url + /users ------------>|
+    |                                   |<-------- response ----------------------|
+    |<-------- response ----------------|                                       |`}
           </CodeBlock>
         </Section>
 
         <Divider sx={{ my: 6 }} />
 
-        {/* Admin Configuration */}
-        <Section icon={DashboardIcon} title="Admin Configuration">
+        {/* Config Setup */}
+        <Section icon={DashboardIcon} title="Config Setup" id="config-setup">
           <Typography variant="body1" paragraph>
-            Before using the proxy, you need to configure your collections, endpoints, and API keys in the admin panel.
-            <strong> Sign up or log in</strong> to access the admin features.
+            Sign in, then go to <strong>Configs</strong> in the menu.
           </Typography>
-
           <Accordion defaultExpanded>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">Step 1: Create a Collection</Typography>
+              <Typography variant="subtitle1">1. Create a config key</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" paragraph>
-                A <strong>Collection</strong> groups related API endpoints together. For example, you might have 
-                a "GitHub API" collection or a "Payment APIs" collection.
+                Create a config key and copy its API key (starts with <code>lp_</code>). Set the <strong>target URL</strong> (e.g. <code>https://api.github.com</code>) and chaos: fail rate (0–100), min/max latency (ms), method (or ANY), optional error codes.
               </Typography>
-              <Typography variant="body2" component="div">
-                <ol>
-                  <li>Go to <strong>Endpoints</strong> page in the navigation</li>
-                  <li>Click <strong>"Add Collection"</strong></li>
-                  <li>Enter a name (e.g., "GitHub API") and optional description</li>
-                  <li>Click <strong>"Create"</strong></li>
-                </ol>
-              </Typography>
-              <Alert severity="info" sx={{ mt: 2 }}>
-                Each collection has a unique ID (shown in the URL). You'll use this ID when calling the proxy: 
-                <code>/proxy/&#123;collectionId&#125;?...</code>
-              </Alert>
             </AccordionDetails>
           </Accordion>
-
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">Step 2: Add Endpoints to Collection</Typography>
+              <Typography variant="subtitle1">2. Use the proxy URL in your app</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" paragraph>
-                <strong>Endpoints</strong> define the URL patterns you want to proxy and their latency/failure settings.
-              </Typography>
-              <Typography variant="body2" component="div">
-                <ol>
-                  <li>Expand the collection you created</li>
-                  <li>Click <strong>"Add Endpoint"</strong></li>
-                  <li>Configure the endpoint:
-                    <ul>
-                      <li><strong>Name:</strong> A descriptive name (e.g., "Get Users")</li>
-                      <li><strong>URL Pattern:</strong> The target URL or pattern (e.g., <code>https://api.github.com/*</code>)</li>
-                      <li><strong>Min/Max Latency:</strong> Delay range in milliseconds</li>
-                      <li><strong>Fail Rate:</strong> Percentage chance of returning an error (0-100%)</li>
-                    </ul>
-                  </li>
-                  <li>Click <strong>"Save"</strong></li>
-                </ol>
-              </Typography>
-              
-              <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>URL Pattern Examples</Typography>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><strong>Pattern</strong></TableCell>
-                      <TableCell><strong>Matches</strong></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell><code>https://api.github.com/users</code></TableCell>
-                      <TableCell>Exact URL only</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell><code>https://api.github.com/*</code></TableCell>
-                      <TableCell>Any path under api.github.com</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell><code>https://*.github.com/*</code></TableCell>
-                      <TableCell>Any subdomain and path</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell><code>*</code></TableCell>
-                      <TableCell>Any URL (catch-all)</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                <strong>Pattern Priority:</strong> More specific patterns take precedence. If you have both 
-                <code> https://api.github.com/users</code> and <code>https://api.github.com/*</code>, 
-                the exact match will be used for <code>/users</code> requests.
-              </Alert>
-            </AccordionDetails>
-          </Accordion>
-
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">Step 3: Create an API Key</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography variant="body2" paragraph>
-                <strong>API Keys</strong> authenticate requests to the proxy and control access to collections.
-              </Typography>
-              <Typography variant="body2" component="div">
-                <ol>
-                  <li>Go to <strong>API Keys</strong> page in the navigation</li>
-                  <li>Click <strong>"Create API Key"</strong></li>
-                  <li>Enter a name (e.g., "Development", "CI/CD", "Team A")</li>
-                  <li>Choose collection access:
-                    <ul>
-                      <li><strong>All Collections:</strong> Key can access any collection</li>
-                      <li><strong>Specific Collections:</strong> Select which collections this key can access</li>
-                    </ul>
-                  </li>
-                  <li>Click <strong>"Create"</strong></li>
-                  <li><strong>Copy the API key</strong> - it starts with <code>lp_</code> and is shown only once!</li>
-                </ol>
-              </Typography>
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                <strong>Save your API key!</strong> It's only shown once when created. Store it in a secure 
-                location like environment variables or a secrets manager.
-              </Alert>
-            </AccordionDetails>
-          </Accordion>
-
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">Step 4: Test Your Configuration</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography variant="body2" paragraph>
-                Use the built-in test feature in the Endpoints page to verify your configuration works:
-              </Typography>
-              <Typography variant="body2" component="div">
-                <ol>
-                  <li>In the <strong>Endpoints</strong> page, select your API key from the dropdown</li>
-                  <li>Find the endpoint you want to test</li>
-                  <li>Click the <strong>"Test"</strong> button</li>
-                  <li>View the response, status code, and actual response time (including injected latency)</li>
-                </ol>
-              </Typography>
-              <Typography variant="body2" paragraph sx={{ mt: 2 }}>
-                You can also copy the cURL command or proxy URL to test externally.
+                In your config file, point the base URL to <code>https://proxy:port/your_api_key</code>. Requests to that URL (and subpaths) are forwarded to the key’s target URL with the same path. Example: <code>https://localhost:8080/lp_xxx/users</code> → <code>https://api.github.com/users</code> (if target URL is <code>https://api.github.com</code>).
               </Typography>
             </AccordionDetails>
           </Accordion>
@@ -272,151 +195,72 @@ function Documentation() {
         <Divider sx={{ my: 6 }} />
 
         {/* API Reference */}
-        <Section icon={CodeIcon} title="API Reference">
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Chip label="ANY" color="primary" size="small" />
-                <Typography variant="subtitle1" sx={{ fontFamily: 'monospace' }}>
-                  /proxy/:collectionId
-                </Typography>
-              </Stack>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography variant="body2" paragraph>
-                Proxy requests using pre-configured endpoint settings. Supports all HTTP methods 
-                (GET, POST, PUT, DELETE, PATCH, etc.). The latency and fail rate are defined in the 
-                collection configuration.
-              </Typography>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><strong>Parameter</strong></TableCell>
-                      <TableCell><strong>Type</strong></TableCell>
-                      <TableCell><strong>Required</strong></TableCell>
-                      <TableCell><strong>Description</strong></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell><code>:collectionId</code></TableCell>
-                      <TableCell>integer</TableCell>
-                      <TableCell>Yes</TableCell>
-                      <TableCell>Path parameter - ID of the collection (from Endpoints page)</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell><code>api_key</code></TableCell>
-                      <TableCell>string</TableCell>
-                      <TableCell>Yes*</TableCell>
-                      <TableCell>Your API key (query param, header, or bearer token)</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell><code>url</code></TableCell>
-                      <TableCell>string</TableCell>
-                      <TableCell>Yes</TableCell>
-                      <TableCell>Target URL - must match a configured endpoint pattern</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>Authentication Methods</Typography>
-              <Typography variant="body2" paragraph>
-                You can provide the API key in three ways:
-              </Typography>
-              
-              <CodeBlock title="Method 1: Query Parameter (recommended for testing)">
-{`curl "${proxyBaseUrl}/proxy/1?api_key=lp_xxxxxxxxxxxx&url=https://api.github.com/users"`}
-              </CodeBlock>
-              <CodeBlock title="Method 2: X-API-Key Header">
-{`curl -H "X-API-Key: lp_xxxxxxxxxxxx" \\
-  "${proxyBaseUrl}/proxy/1?url=https://api.github.com/users"`}
-              </CodeBlock>
-              <CodeBlock title="Method 3: Bearer Token">
-{`curl -H "Authorization: Bearer lp_xxxxxxxxxxxx" \\
-  "${proxyBaseUrl}/proxy/1?url=https://api.github.com/users"`}
-              </CodeBlock>
-
-              <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>Example: POST Request</Typography>
-              <CodeBlock title="POST with JSON body">
-{`curl -X POST "${proxyBaseUrl}/proxy/1?api_key=lp_xxxxxxxxxxxx&url=https://jsonplaceholder.typicode.com/posts" \\
+        <Section icon={CodeIcon} title="API Reference" id="api-reference">
+          <Typography variant="body1" paragraph>
+            The proxy path is <strong>/{'{apiKey}'}</strong> or <strong>/{'{apiKey}'}/path</strong>. The API key is the first path segment. The rest of the path (and query) is appended to the key’s target URL.
+          </Typography>
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell><strong>Path</strong></TableCell>
+                  <TableCell><strong>Description</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow>
+                  <TableCell><code>/{'{apiKey}'}</code></TableCell>
+                  <TableCell>Forwards to key’s target_url (root).</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell><code>/{'{apiKey}'}/path</code></TableCell>
+                  <TableCell>Forwards to key’s target_url + /path (and query).</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <CodeBlock title="GET">
+{`curl "${proxyBaseUrl}/${displayApiKey}/users"`}
+          </CodeBlock>
+          <CodeBlock title="GET with query">
+{`curl "${proxyBaseUrl}/${displayApiKey}/users?since=0"`}
+          </CodeBlock>
+          <CodeBlock title="POST with body">
+{`curl -X POST "${proxyBaseUrl}/${displayApiKey}/post" \\
   -H "Content-Type: application/json" \\
-  -d '{"title": "Test", "body": "Hello World"}'`}
-              </CodeBlock>
-            </AccordionDetails>
-          </Accordion>
+  -d '{"key": "value"}'`}
+          </CodeBlock>
         </Section>
 
         <Divider sx={{ my: 6 }} />
 
-        {/* Integration Examples */}
-        <Section icon={SettingsIcon} title="Integration Examples">
+        {/* Examples */}
+        <Section icon={SettingsIcon} title="Examples" id="examples">
           <Typography variant="body1" paragraph>
-            The key concept is to replace direct API calls with calls to Latency Poison, passing the original 
-            URL as a parameter. Here are patterns for different languages and frameworks:
+            Set your app’s base URL to <code>https://proxy:port/your_api_key</code>. All requests go through the proxy; path and query are appended to the key’s target URL.
           </Typography>
 
           <Accordion defaultExpanded>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">JavaScript / Node.js</Typography>
+              <Typography variant="subtitle1">Node / JavaScript</Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <CodeBlock title="config.js">
-{`// Configuration
-const USE_LATENCY_POISON = process.env.USE_LATENCY_POISON === 'true';
-const LATENCY_POISON_URL = process.env.LATENCY_POISON_URL || '${proxyBaseUrl}';
-const LATENCY_POISON_COLLECTION = process.env.LATENCY_POISON_COLLECTION || '1';
-const LATENCY_POISON_API_KEY = process.env.LATENCY_POISON_API_KEY || '';
+              <CodeBlock title="config">
+{`const LP_BASE = process.env.LATENCY_POISON_URL || '${proxyBaseUrl}';
+const LP_KEY = process.env.LATENCY_POISON_API_KEY || '';
 
-/**
- * Wraps a URL to go through Latency Poison proxy
- * @param {string} targetUrl - The actual API URL you want to call
- * @returns {string} - Either the proxied URL or the original URL
- */
-function proxyUrl(targetUrl) {
-  if (!USE_LATENCY_POISON) {
-    return targetUrl;
-  }
-  const params = new URLSearchParams({
-    api_key: LATENCY_POISON_API_KEY,
-    url: targetUrl
-  });
-  return \`\${LATENCY_POISON_URL}/proxy/\${LATENCY_POISON_COLLECTION}?\${params}\`;
-}
-
-module.exports = { proxyUrl };`}
+// Base URL for API calls: https://proxy:port/your_key -> target_url
+const API_BASE = LP_KEY ? \`\${LP_BASE}/\${LP_KEY}\` : 'https://api.github.com';`}
               </CodeBlock>
-              <CodeBlock title="api.js - Usage">
-{`const { proxyUrl } = require('./config');
-
-async function getGitHubUser(username) {
-  // Without Latency Poison: https://api.github.com/users/octocat
-  // With Latency Poison:    ${proxyBaseUrl}/proxy/1?api_key=xxx&url=https://api.github.com/users/octocat
-  const url = proxyUrl(\`https://api.github.com/users/\${username}\`);
-  
-  const response = await fetch(url);
-  return response.json();
-}
-
-async function createPost(data) {
-  // POST requests work the same way
-  const url = proxyUrl('https://jsonplaceholder.typicode.com/posts');
-  
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
-  return response.json();
-}`}
+              <CodeBlock title="Usage">
+{`const response = await fetch(\`\${API_BASE}/users/\${username}\`);
+return response.json();
+// Without LP: https://api.github.com/users/octocat
+// With LP:    ${proxyBaseUrl}/${displayApiKey}/users/octocat -> target_url + /users/octocat`}
               </CodeBlock>
               <CodeBlock title=".env">
-{`# Enable Latency Poison in development
-USE_LATENCY_POISON=true
-LATENCY_POISON_URL=${proxyBaseUrl}
-LATENCY_POISON_COLLECTION=1
-LATENCY_POISON_API_KEY=lp_xxxxxxxxxxxx`}
+{`LATENCY_POISON_URL=${proxyBaseUrl}
+LATENCY_POISON_API_KEY=${displayApiKey}`}
               </CodeBlock>
             </AccordionDetails>
           </Accordion>
@@ -426,51 +270,20 @@ LATENCY_POISON_API_KEY=lp_xxxxxxxxxxxx`}
               <Typography variant="subtitle1">Python</Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <CodeBlock title="config.py">
+              <CodeBlock title="config">
 {`import os
-from urllib.parse import urlencode
 
-USE_LATENCY_POISON = os.getenv('USE_LATENCY_POISON', 'false').lower() == 'true'
-LATENCY_POISON_URL = os.getenv('LATENCY_POISON_URL', '${proxyBaseUrl}')
-LATENCY_POISON_COLLECTION = os.getenv('LATENCY_POISON_COLLECTION', '1')
-LATENCY_POISON_API_KEY = os.getenv('LATENCY_POISON_API_KEY', '')
+LP_BASE = os.getenv('LATENCY_POISON_URL', '${proxyBaseUrl}')
+LP_KEY = os.getenv('LATENCY_POISON_API_KEY', '')
 
-def proxy_url(target_url: str) -> str:
-    """
-    Wraps a URL to go through Latency Poison proxy.
-    
-    Args:
-        target_url: The actual API URL you want to call
-        
-    Returns:
-        Either the proxied URL or the original URL
-    """
-    if not USE_LATENCY_POISON:
-        return target_url
-    
-    params = urlencode({
-        'api_key': LATENCY_POISON_API_KEY,
-        'url': target_url
-    })
-    return f"{LATENCY_POISON_URL}/proxy/{LATENCY_POISON_COLLECTION}?{params}"`}
+API_BASE = f"{LP_BASE}/{LP_KEY}" if LP_KEY else "https://api.github.com"`}
               </CodeBlock>
-              <CodeBlock title="api.py - Usage">
+              <CodeBlock title="Usage">
 {`import requests
-from config import proxy_url
 
 def get_github_user(username: str) -> dict:
-    # Without Latency Poison: https://api.github.com/users/octocat
-    # With Latency Poison:    ${proxyBaseUrl}/proxy/1?api_key=xxx&url=https://api.github.com/users/octocat
-    url = proxy_url(f'https://api.github.com/users/{username}')
-    
+    url = f"{API_BASE}/users/{username}"
     response = requests.get(url)
-    return response.json()
-
-def create_post(data: dict) -> dict:
-    # POST requests work the same way
-    url = proxy_url('https://jsonplaceholder.typicode.com/posts')
-    
-    response = requests.post(url, json=data)
     return response.json()`}
               </CodeBlock>
             </AccordionDetails>
@@ -481,43 +294,15 @@ def create_post(data: dict) -> dict:
               <Typography variant="subtitle1">React / Frontend</Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <CodeBlock title="src/utils/proxy.js">
-{`const USE_LATENCY_POISON = process.env.REACT_APP_USE_LATENCY_POISON === 'true';
-const LATENCY_POISON_URL = process.env.REACT_APP_LATENCY_POISON_URL || '${proxyBaseUrl}';
-const LATENCY_POISON_COLLECTION = process.env.REACT_APP_LATENCY_POISON_COLLECTION || '1';
-const LATENCY_POISON_API_KEY = process.env.REACT_APP_LATENCY_POISON_API_KEY || '';
+              <CodeBlock title="config">
+{`const LP_BASE = process.env.REACT_APP_LATENCY_POISON_URL || '${proxyBaseUrl}';
+const LP_KEY = process.env.REACT_APP_LATENCY_POISON_API_KEY || '';
 
-export function proxyUrl(targetUrl) {
-  if (!USE_LATENCY_POISON) {
-    return targetUrl;
-  }
-  const params = new URLSearchParams({
-    api_key: LATENCY_POISON_API_KEY,
-    url: targetUrl
-  });
-  return \`\${LATENCY_POISON_URL}/proxy/\${LATENCY_POISON_COLLECTION}?\${params}\`;
-}`}
-              </CodeBlock>
-              <CodeBlock title="src/api/github.js - Usage">
-{`import { proxyUrl } from '../utils/proxy';
-
-export async function fetchGitHubUser(username) {
-  // In production: calls https://api.github.com/users/octocat directly
-  // In development: calls ${proxyBaseUrl}/proxy/1?api_key=xxx&url=https://api.github.com/users/octocat
-  const url = proxyUrl(\`https://api.github.com/users/\${username}\`);
-  
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(\`HTTP \${response.status}\`);
-  }
-  return response.json();
-}`}
+export const API_BASE = LP_KEY ? \`\${LP_BASE}/\${LP_KEY}\` : 'https://api.github.com';`}
               </CodeBlock>
               <CodeBlock title=".env.development">
-{`REACT_APP_USE_LATENCY_POISON=true
-REACT_APP_LATENCY_POISON_URL=${proxyBaseUrl}
-REACT_APP_LATENCY_POISON_COLLECTION=1
-REACT_APP_LATENCY_POISON_API_KEY=lp_xxxxxxxxxxxx`}
+{`REACT_APP_LATENCY_POISON_URL=${proxyBaseUrl}
+REACT_APP_LATENCY_POISON_API_KEY=${displayApiKey}`}
               </CodeBlock>
             </AccordionDetails>
           </Accordion>
@@ -538,11 +323,8 @@ services:
   app:
     build: .
     environment:
-      - USE_LATENCY_POISON=true
-      # Use Docker service name as host
       - LATENCY_POISON_URL=http://latency-poison:8080
-      - LATENCY_POISON_COLLECTION=1
-      - LATENCY_POISON_API_KEY=lp_xxxxxxxxxxxx
+      - LATENCY_POISON_API_KEY=${displayApiKey}
     depends_on:
       - latency-poison
 
@@ -563,222 +345,86 @@ volumes:
 
         <Divider sx={{ my: 6 }} />
 
-        {/* DNS / Hosts Setup */}
-        <Section icon={DnsIcon} title="Advanced: Transparent Proxy with DNS Override">
+        {/* MITM Proxy */}
+        <Section icon={SecurityIcon} title="MITM Proxy (Per-Request Chaos)" id="mitm-proxy">
           <Alert severity="info" sx={{ mb: 3 }}>
-            This advanced setup allows you to intercept API calls <strong>without modifying your application code</strong>.
-            Your app calls <code>api.github.com</code> normally, but the request is secretly routed through Latency Poison.
+            The <strong>MITM Proxy</strong> on port <code>9090</code> provides <strong>per-request</strong> chaos for HTTPS traffic.
+            It forwards each request to the proxy using your API key in the path (<code>/{'{apiKey}'}/path</code>) so your key’s target URL and chaos apply per request.
           </Alert>
-
-          <Typography variant="body1" paragraph>
-            <strong>How it works:</strong>
-          </Typography>
-          <Typography variant="body2" component="div" sx={{ mb: 3 }}>
-            <ol>
-              <li>Modify your <code>/etc/hosts</code> file to point <code>api.github.com</code> to <code>127.0.0.1</code></li>
-              <li>Run a local nginx that listens on port 443 (HTTPS) for <code>api.github.com</code></li>
-              <li>Nginx receives the request and forwards it to Latency Poison with the original URL as a parameter</li>
-              <li>Latency Poison applies latency/failures and calls the real <code>api.github.com</code></li>
-            </ol>
-          </Typography>
-
-          <CodeBlock title="Flow diagram">
-{`Your App                    Local Machine                     Latency Poison                Real API
-    |                             |                                   |                           |
-    |-- GET api.github.com/users->|                                   |                           |
-    |   (resolves to 127.0.0.1)   |                                   |                           |
-    |                             |                                   |                           |
-    |                        [nginx:443]                              |                           |
-    |                             |                                   |                           |
-    |                             |-- GET /proxy/1?api_key=xxx&url=https://api.github.com/users ->|
-    |                             |                                   |                           |
-    |                             |                              [add latency]                    |
-    |                             |                              [maybe fail]                     |
-    |                             |                                   |                           |
-    |                             |                                   |-- GET /users ------------>|
-    |                             |                                   |                           |
-    |                             |                                   |<-- response --------------|
-    |                             |                                   |                           |
-    |                             |<---------- response --------------|                           |
-    |                             |                                   |                           |
-    |<------- response -----------|                                   |                           |`}
-          </CodeBlock>
-
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">Step 1: Generate SSL Certificate</Typography>
-            </AccordionSummary>
+          <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Setup Instructions</Typography>
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography>Step 1: Start Services</Typography></AccordionSummary>
             <AccordionDetails>
-              <Typography variant="body2" paragraph>
-                Create a self-signed certificate for the domains you want to intercept:
-              </Typography>
-              <CodeBlock title="generate-cert.sh">
-{`#!/bin/bash
-# Generate self-signed certificate for local HTTPS interception
-
-mkdir -p /etc/nginx/ssl
-
-# Generate certificate for api.github.com
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\
-  -keyout /etc/nginx/ssl/api.github.com.key \\
-  -out /etc/nginx/ssl/api.github.com.crt \\
-  -subj "/CN=api.github.com"
-
-# Trust the certificate (macOS)
-sudo security add-trusted-cert -d -r trustRoot \\
-  -k /Library/Keychains/System.keychain \\
-  /etc/nginx/ssl/api.github.com.crt
-
-# Trust the certificate (Ubuntu/Debian)
-# sudo cp /etc/nginx/ssl/api.github.com.crt /usr/local/share/ca-certificates/
-# sudo update-ca-certificates`}
-              </CodeBlock>
+              <Typography paragraph>The MITM proxy starts with <code>make dev</code> using the default config API key.</Typography>
+              <CodeBlock title="Start all services">{`make dev\n# Default API key: lp_default_admin_key_change_in_production`}</CodeBlock>
             </AccordionDetails>
           </Accordion>
-
           <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">Step 2: Configure Nginx</Typography>
-            </AccordionSummary>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography>Step 2: Extract CA Certificate</Typography></AccordionSummary>
             <AccordionDetails>
-              <Typography variant="body2" paragraph>
-                Configure nginx to intercept requests and forward them to Latency Poison:
-              </Typography>
-              <CodeBlock title="nginx.conf">
-{`# Nginx config to intercept api.github.com and route through Latency Poison
-
-events {
-    worker_connections 1024;
-}
-
-http {
-    # Latency Poison upstream (adjust host/port as needed)
-    upstream latency_poison {
-        server 127.0.0.1:8080;  # Or your Latency Poison server address
-    }
-
-    # HTTPS server for api.github.com
-    server {
-        listen 443 ssl;
-        server_name api.github.com;
-
-        ssl_certificate /etc/nginx/ssl/api.github.com.crt;
-        ssl_certificate_key /etc/nginx/ssl/api.github.com.key;
-
-        location / {
-            # Build the Latency Poison proxy URL
-            set $lp_collection "1";
-            set $lp_api_key "lp_xxxxxxxxxxxx";
-            set $target_url "https://api.github.com$request_uri";
-
-            # Forward to Latency Poison
-            proxy_pass http://latency_poison/proxy/$lp_collection?api_key=$lp_api_key&url=$target_url;
-            
-            # Pass through headers
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-    }
-
-    # HTTP server (optional)
-    server {
-        listen 80;
-        server_name api.github.com;
-
-        location / {
-            set $lp_collection "1";
-            set $lp_api_key "lp_xxxxxxxxxxxx";
-            set $target_url "http://api.github.com$request_uri";
-
-            proxy_pass http://latency_poison/proxy/$lp_collection?api_key=$lp_api_key&url=$target_url;
-        }
-    }
-}`}
-              </CodeBlock>
+              <Typography paragraph>Extract the mitmproxy CA cert to install in your browser.</Typography>
+              <CodeBlock title="Extract Certificate">{`make mitmproxy-cert`}</CodeBlock>
             </AccordionDetails>
           </Accordion>
-
           <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">Step 3: Modify Hosts File</Typography>
-            </AccordionSummary>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography>Step 3: Install Certificate in Browser</Typography></AccordionSummary>
             <AccordionDetails>
-              <Typography variant="body2" paragraph>
-                Point the domain to your local machine so nginx can intercept the requests:
-              </Typography>
-              <CodeBlock title="/etc/hosts (Linux/Mac) or C:\Windows\System32\drivers\etc\hosts (Windows)">
-{`# Latency Poison DNS Override
-# Redirect these domains to local nginx
-127.0.0.1    api.github.com
-
-# Add more domains as needed:
-# 127.0.0.1    jsonplaceholder.typicode.com
-# 127.0.0.1    api.stripe.com`}
-              </CodeBlock>
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                <strong>Important:</strong> Remove these entries when you're done testing!
-                Otherwise all your requests to these domains will fail when nginx/Latency Poison isn't running.
+              <Typography variant="body2" paragraph>Firefox: Settings → Privacy &amp; Security → Certificates → View Certificates → Authorities → Import. Chrome: Settings → Privacy and Security → Security → Manage certificates → Authorities → Import.</Typography>
+            </AccordionDetails>
+          </Accordion>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography>Step 4: Configure Browser Proxy</Typography></AccordionSummary>
+            <AccordionDetails>
+              <Typography paragraph>Set your browser proxy to:</Typography>
+              <TableContainer component={Paper} sx={{ mb: 2 }}>
+                <Table size="small">
+                  <TableBody>
+                    <TableRow>
+                      <TableCell><strong>HTTP Proxy</strong></TableCell>
+                      <TableCell><code>{mitmProxyUrl}</code></TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell><strong>HTTPS Proxy</strong></TableCell>
+                      <TableCell><code>{mitmProxyUrl}</code></TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <Alert severity="info">
+                No authentication is needed for the MITM proxy; your API key is configured when starting the service.
               </Alert>
             </AccordionDetails>
           </Accordion>
 
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">Docker Alternative</Typography>
+              <Typography>View MITM Proxy Logs</Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <Typography variant="body2" paragraph>
-                For Docker-based applications, use the <code>extra_hosts</code> option to override DNS 
-                and a custom network to route traffic:
-              </Typography>
-              <CodeBlock title="docker-compose.yml">
-{`version: '3.8'
+              <CodeBlock title="View Logs">
+{`# View MITM proxy logs
+make mitmproxy-logs
 
-services:
-  # Your application
-  app:
-    build: .
-    extra_hosts:
-      # Point api.github.com to the nginx container's IP
-      - "api.github.com:172.28.0.10"
-    networks:
-      - proxy-net
-    depends_on:
-      - nginx
-
-  # Nginx intercept proxy
-  nginx:
-    image: nginx:alpine
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    networks:
-      proxy-net:
-        ipv4_address: 172.28.0.10  # Fixed IP for extra_hosts
-    depends_on:
-      - latency-poison
-
-  # Latency Poison
-  latency-poison:
-    image: latency-poison:latest
-    networks:
-      - proxy-net
-
-networks:
-  proxy-net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16`}
+# Or with docker-compose
+docker-compose logs -f mitmproxy`}
               </CodeBlock>
+              <Typography paragraph sx={{ mt: 2 }}>
+                Each request will show in the logs as it's forwarded through the Latency Poison API proxy.
+              </Typography>
             </AccordionDetails>
           </Accordion>
+
+          <Alert severity="success" sx={{ mt: 3 }}>
+            <strong>Result:</strong> With MITM proxy, when you load a page with 20 images from the same domain,
+            each image request is handled individually. Some may load fast, some slow, and some may fail -
+            exactly matching your config's latency and fail rate settings.
+          </Alert>
         </Section>
 
         <Divider sx={{ my: 6 }} />
 
         {/* Security */}
-        <Section icon={SecurityIcon} title="Security Best Practices">
+        <Section icon={SecurityIcon} title="Security Best Practices" id="security">
           <Alert severity="error" sx={{ mb: 3 }}>
             <strong>Never use Latency Poison in production!</strong> It's designed for development and testing only.
           </Alert>
@@ -823,7 +469,7 @@ if os.getenv('ENVIRONMENT') == 'production':
         {/* Footer */}
         <Box sx={{ mt: 8, py: 4, textAlign: 'center', borderTop: '1px solid', borderColor: 'divider' }}>
           <Typography variant="body2" color="text.secondary">
-            Need help? <a href="/register" style={{ color: 'inherit' }}>Create an account</a> to configure your collections and endpoints.
+            Need help? <a href="/register" style={{ color: 'inherit' }}>Create an account</a> to create config keys (one key → one target URL).
           </Typography>
         </Box>
       </Container>

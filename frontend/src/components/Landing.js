@@ -27,7 +27,7 @@ import {
   VisibilityOff as VisibilityOffIcon,
   Storage as StorageIcon,
 } from '@mui/icons-material';
-import { API_ENDPOINTS } from '../config';
+import { API_ENDPOINTS, PROXY_API_BASE_URL } from '../config';
 
 function FeatureCard({ icon: Icon, title, description }) {
   return (
@@ -231,12 +231,11 @@ function Landing() {
                 </Box>
               </Box>
               <Typography variant="h5" sx={{ mb: 3, color: 'text.secondary' }}>
-                Test your application's resilience with configurable API latency and failure injection
+                One config key → one target URL. Add latency and failures to any API.
               </Typography>
               <Typography variant="body1" sx={{ mb: 4, color: 'text.secondary' }}>
-                A proxy service that sits between your app and external APIs, allowing you to simulate 
-                network delays, random failures, and timeout scenarios. Perfect for chaos engineering 
-                and testing error handling.
+                Create a config key with a target URL and chaos settings. Call the proxy with your key in the path —
+                e.g. <code>{PROXY_API_BASE_URL.replace(/\/$/, '')}/your_key/users</code> — and traffic is forwarded with latency and failure injection applied.
               </Typography>
               <Stack direction="row" spacing={2}>
                 <Button
@@ -268,7 +267,7 @@ function Landing() {
       <Box sx={{ bgcolor: 'background.paper', py: 8 }}>
         <Container maxWidth="lg">
           <Typography variant="h3" align="center" gutterBottom sx={{ mb: 2 }}>
-            See It In Action
+            How it works
           </Typography>
           <Typography variant="body1" align="center" color="text.secondary" sx={{ mb: 6 }}>
             Manage your collections, endpoints, and API keys with an intuitive dashboard
@@ -644,3 +643,4 @@ function Landing() {
 }
 
 export default Landing;
+;

@@ -15,17 +15,17 @@ function Navbar({ user, setUser }) {
   };
 
   return (
-    <AppBar position="static">
+    <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
       <Toolbar>
-        <Box 
-          component={RouterLink} 
+        <Box
+          component={RouterLink}
           to="/"
-          sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            flexGrow: 1, 
-            textDecoration: 'none', 
-            color: 'inherit' 
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            textDecoration: 'none',
+            color: 'inherit',
+            mr: 2,
           }}
         >
           <img
@@ -37,20 +37,12 @@ function Navbar({ user, setUser }) {
             Latency Poison
           </Typography>
         </Box>
-        <Box>
+        <Box sx={{ flexGrow: 1 }} />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {user ? (
             <>
-              <Button color="inherit" component={RouterLink} to="/dashboard">
-                Dashboard
-              </Button>
-              <Button color="inherit" component={RouterLink} to="/sandbox">
-                Sandbox
-              </Button>
-              <Button color="inherit" component={RouterLink} to="/endpoints">
-                Endpoints
-              </Button>
-              <Button color="inherit" component={RouterLink} to="/api-keys">
-                API Keys
+              <Button color="inherit" component={RouterLink} to="/configs">
+                Configs
               </Button>
               <Button color="inherit" component={RouterLink} to="/docs">
                 Docs
@@ -73,10 +65,10 @@ function Navbar({ user, setUser }) {
               <Button color="inherit" component={RouterLink} to="/login">
                 Login
               </Button>
-              <Button 
-                variant="outlined" 
-                color="inherit" 
-                component={RouterLink} 
+              <Button
+                variant="outlined"
+                color="inherit"
+                component={RouterLink}
                 to="/register"
                 sx={{ ml: 1 }}
               >

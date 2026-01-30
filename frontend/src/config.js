@@ -7,10 +7,6 @@ export const API_ENDPOINTS = {
     REGISTER: `${API_BASE_URL}/api/auth/register`,
     ME: `${API_BASE_URL}/api/users/me`,
   },
-  COLLECTIONS: `${API_BASE_URL}/api/collections`,
-  ENDPOINTS: `${API_BASE_URL}/api/endpoints`,
-  API_KEYS: `${API_BASE_URL}/api/keys`,
-  // Go API proxy endpoints
+  CONFIG_KEYS: `${API_BASE_URL}/api/config-keys`,
   SANDBOX: `${PROXY_API_BASE_URL}/sandbox`,
-  PROXY: `${PROXY_API_BASE_URL}/proxy`,
-}; 
+};

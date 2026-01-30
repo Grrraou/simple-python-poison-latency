@@ -37,7 +37,7 @@ function Login({ setUser }) {
       };
       localStorage.setItem('token', data.access_token);
       setUser(user);
-      navigate('/');
+      navigate('/configs');
     } catch (err) {
       console.error('Login error:', err);
       // Handle different types of error responses
