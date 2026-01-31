@@ -6,10 +6,6 @@ import {
   Box,
   Button,
   TextField,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
   IconButton,
   Dialog,
   DialogTitle,
@@ -18,7 +14,6 @@ import {
   Snackbar,
   Alert,
   Switch,
-  FormControlLabel,
   Select,
   MenuItem,
   FormControl,
@@ -196,14 +191,36 @@ function Configs() {
               Add Key
             </Button>
           </Box>
-          <List dense disablePadding>
-            {configKeys.map((key) => (
-              <ListItem
-                key={key.id}
-                disablePadding
-                secondaryAction={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }} onClick={(e) => e.stopPropagation()}>
-                    <IconButton size="small" onClick={() => copyKey(`${PROXY_API_BASE_URL.replace(/\/$/, '')}/${key.key}`)} title="Copy example URL" aria-label="Copy URL">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {configKeys.map((key) => {
+              const isSelected = selectedKeyId === key.id;
+              const secondary = key.target_url
+                ? key.target_url + (key.fail_rate ? ` · ${key.fail_rate}% fail` : '')
+                : 'Set target URL';
+              return (
+                <Box
+                  key={key.id}
+                  onClick={() => setSelectedKeyId(key.id)}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    p: 2,
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    bgcolor: isSelected ? 'action.selected' : 'action.hover',
+                    border: '1px solid',
+                    borderColor: isSelected ? 'primary.main' : 'divider',
+                  }}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="subtitle1" noWrap>{key.name}</Typography>
+                    <Typography variant="body2" color={key.is_active ? 'text.secondary' : 'error'} noWrap sx={{ mt: 0.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {secondary}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                    <IconButton size="small" onClick={() => copyKey(`${PROXY_API_BASE_URL.replace(/\/$/, '')}/${key.key}`)} title="Copy URL" aria-label="Copy URL">
                       <ContentCopyIcon fontSize="small" />
                     </IconButton>
                     <Switch
@@ -213,27 +230,14 @@ function Configs() {
                       title={key.is_active ? 'Disable' : 'Enable'}
                       onClick={(e) => e.stopPropagation()}
                     />
-                    <IconButton size="small" onClick={() => handleDeleteKey(key)} title="Delete key" aria-label="Delete key">
+                    <IconButton size="small" onClick={() => handleDeleteKey(key)} title="Delete" aria-label="Delete">
                       <DeleteIcon fontSize="small" />
                     </IconButton>
                   </Box>
-                }
-                sx={{ alignItems: 'center', borderRadius: 1, mb: 0.5 }}
-              >
-                <ListItemButton
-                  selected={selectedKeyId === key.id}
-                  onClick={() => setSelectedKeyId(key.id)}
-                  sx={{ borderRadius: 1, py: 1.25, pr: 14 }}
-                >
-                  <ListItemText
-                    primary={key.name}
-                    secondary={key.target_url ? (key.target_url + (key.fail_rate ? ` · ${key.fail_rate}% fail` : '')) : 'Set target URL'}
-                    secondaryTypographyProps={{ color: key.is_active ? 'text.secondary' : 'error', variant: 'body2', noWrap: true }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
+                </Box>
+              );
+            })}
+          </Box>
           {newKeyReveal && (
             <Alert severity="info" sx={{ mt: 2 }} onClose={() => setNewKeyReveal(null)}>
               New key: <strong>{newKeyReveal}</strong>
@@ -248,7 +252,7 @@ function Configs() {
           ) : (
             <>
               <Typography variant="h6" sx={{ mb: 2 }}>
-                {selectedKey.name} — one URL
+                {selectedKey.name}
               </Typography>
               {editForm && (
                 <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
